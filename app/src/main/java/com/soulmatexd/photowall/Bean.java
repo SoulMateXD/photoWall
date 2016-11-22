@@ -1,10 +1,12 @@
 package com.soulmatexd.photowall;
 
+import java.util.ArrayList;
+
 /**
  * Created by SoulMateXD on 2016/11/14.
  */
 
-public class Bean<T> {
+public class Bean {
     boolean error;
-    T results;
+    ArrayList<MyImage> results;
 }

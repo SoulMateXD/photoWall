@@ -3,6 +3,7 @@ package com.soulmatexd.photowall;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.media.Image;
 import android.os.AsyncTask;
 import android.support.v4.view.PagerAdapter;
@@ -104,16 +105,32 @@ public class ShowImg extends AppCompatActivity {
         @Override
         public Object instantiateItem(ViewGroup container, int position) {
             ImageView imageView = new ImageView(context);
+            imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
             Bitmap bitmap = getBitmapFromMemoryCache(datas.get(position).getUrl());
-            if (bitmap != null){
+            if (bitmap != null) {
                 imageView.setImageBitmap(bitmap);
-            }else {
-                imageView.setImageBitmap(MyBitmapFactory.
-                        decodeSampleBitmapFromResource(getResources(), R.drawable.xd, reqWidth, reqHeight));
-                ShowImg.DownLoadTask downLoadTask = new ShowImg.DownLoadTask(imageView);
-                downLoadTask.execute(datas.get(position));
-
+                container.addView(imageView);
+                return imageView;
             }
+            DiskLruCache.Snapshot snapshot = null;
+            try {
+                 snapshot = mDiskLruCache.get(Util.hashKeyFromString(datas.get(position).getUrl()));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            if (snapshot != null){
+                bitmap = MyBitmapFactory.decodeSampleBitmapFromSnapshot(snapshot, reqWidth, reqHeight);
+                if (bitmap != null){
+                    imageView.setImageBitmap(bitmap);
+                    container.addView(imageView);
+                    return imageView;
+                }
+            }
+            imageView.setImageBitmap(MyBitmapFactory.
+                    decodeSampleBitmapFromResource(getResources(), R.drawable.xd, reqWidth, reqHeight));
+            ShowImg.DownLoadTask downLoadTask = new ShowImg.DownLoadTask(imageView);
+            downLoadTask.execute(datas.get(position));
             container.addView(imageView);
             return imageView;
 

@@ -164,11 +164,14 @@ class MyBitmapFactory {
         if ( reqHeight == 0 || reqWidth == 0){
             return inSampleSize;
         }
-        if (width>reqWidth || height>reqHeight){
-            int inWidth = Math.round((float)width/(float)reqWidth);
-            int inHeight = Math.round((float)height/(float)reqHeight);
-            inSampleSize = inWidth>inHeight? inWidth:inHeight;
+        if (height > reqHeight || width > reqWidth){
+            int halfHeight = height / 2;
+            int halfWidth = width / 2;
+            while ((halfHeight / inSampleSize >= reqHeight) && (halfWidth/inSampleSize >= reqWidth)){
+                inSampleSize *= 2;
+            }
         }
+
         return inSampleSize;
     }
 

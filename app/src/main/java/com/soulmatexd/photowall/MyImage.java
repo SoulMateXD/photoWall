@@ -9,16 +9,8 @@ import android.os.Parcelable;
  */
 
 public class MyImage implements Parcelable{
-    private String _id;
-    private String createdAt;
-    private String desc;
-    private String publicshedAt;
-    private String source;
-    private String type;
     private String url;
-    private boolean used;
     private String who;
-    private Bitmap bitmap;
 
     public String getUrl() {
         return url;
@@ -28,13 +20,6 @@ public class MyImage implements Parcelable{
         this.url = url;
     }
 
-    public Bitmap getBitmap() {
-        return bitmap;
-    }
-
-    public void setBitmap(Bitmap bitmap) {
-        this.bitmap = bitmap;
-    }
 
     public String getWho() {
         return who;

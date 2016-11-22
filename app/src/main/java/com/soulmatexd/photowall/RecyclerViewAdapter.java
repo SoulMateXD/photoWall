@@ -45,7 +45,7 @@ import static com.soulmatexd.photowall.MyBitmapFactory.decodeSampleBitmapFromSna
 public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> implements View.OnClickListener{
 
     private static final int MAXSIZE = (int) (Runtime.getRuntime().maxMemory()/1024);
-    private static final int CACHESIZE = MAXSIZE/8;
+    private static final int CACHESIZE = MAXSIZE/4;
     private static final long DISK_CACHE_SIZE = 1024*1024*50;//50MB
 
 
@@ -55,20 +55,14 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
     private RecyclerView mPhotoWall;
     private LruCache<String, Bitmap> mMemoryCache;
     private boolean isRecyclerViewIdle = true;
-    private int imageReqWidth = 500;
-    private int imageReqHeight = 500;
+    private int imageReqWidth;
+    private int imageReqHeight;
     private Resources resources;
     private DiskLruCache mDiskLruCache;
     private LinearLayoutManager linearLayoutManager;
     private int lastVisibleItem;
     private Context context;
     private ImgClick imgClick;
-
-
-//    private int firstVisibleItem;
-//    private int visibleItemCount;
-//    private boolean isFrist = true;
-
 
     RecyclerViewAdapter(ArrayList<MyImage> datas, Context context,
                         RecyclerView photoWall, Resources resources){
@@ -78,9 +72,7 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
         this.context = context;
         mPhotoWall = photoWall;
         linearLayoutManager = (LinearLayoutManager) mPhotoWall.getLayoutManager();
-        DisplayMetrics displayMetrics = resources.getDisplayMetrics();
-        imageReqWidth = displayMetrics.widthPixels;
-        imageReqHeight = imageReqWidth;
+        imageReqHeight = imageReqWidth = 300;
 
         //内存缓存
         mMemoryCache = new LruCache<String, Bitmap>(CACHESIZE){
@@ -89,8 +81,6 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
                 return value.getByteCount()/1024;   //换为KB
             }
         };
-
-
 
         //创建硬盘缓存
         File directory = Util.getCacheDiskDir(context, "bitmap");
@@ -104,6 +94,10 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
         }
     }
 
+    public void addDatas(ArrayList<MyImage> datas){
+        this.datas.addAll(datas);
+    }
+
     public void setIsRecyclerViewIdel(Boolean isRecyclerIdel){
         isRecyclerViewIdle = isRecyclerIdel;
     }
@@ -112,9 +106,6 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
         return mMemoryCache;
     }
 
-    public void setDatas(ArrayList<MyImage> datas){
-        this.datas = datas;
-    }
     @Override
     public MyViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         myViewHolder = new MyViewHolder(inflater.inflate(R.layout.image_item, parent, false));
@@ -123,11 +114,13 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
 
     @Override
     public void onBindViewHolder(MyViewHolder holder, int position) {
-        holder.imageView.setTag(datas.get(position).getUrl());   //以url为key
-        setBitmap(holder.imageView, datas.get(position).getUrl());
         holder.textView.setText(datas.get(position).getWho());
-        holder.imageView.setTag(position);
+        holder.imageView.setMinimumHeight(400);
+        holder.imageView.setMaxHeight(400);
         holder.imageView.setOnClickListener(this);
+        //当设置多个tag时，必须在ids.xml中进行设置
+        holder.imageView.setTag(R.id.tag_intent, position);
+        setBitmap(holder.imageView, datas.get(position).getUrl());
     }
 
     @Override
@@ -135,33 +128,36 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
         return datas.size();
     }
 
-
-
-
-
-
-
     //图片三级缓存逻辑函数
     private void setBitmap(ImageView imageView, String url){
         Bitmap bitmap = getBitmapFromMemoryCache(url);
         if(bitmap != null){
             imageView.setImageBitmap(bitmap);
-        }else {
-            bitmap = MyBitmapFactory.decodeSampleBitmapFromResource(resources, R.drawable.xd,
-                    imageReqWidth, imageReqHeight);
-            imageView.setImageBitmap(bitmap);
-            if (isRecyclerViewIdle)
-                setBitmapFromHttp(imageView,url);
+            return;
+        }
+        try {
+            DiskLruCache.Snapshot snapshot = mDiskLruCache.get(Util.hashKeyFromString(url));
+            if (snapshot != null){
+                bitmap = MyBitmapFactory.decodeSampleBitmapFromSnapshot(snapshot, imageReqWidth,imageReqHeight);
+                if (bitmap != null)
+                imageView.setImageBitmap(bitmap);
+                return;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        if (isRecyclerViewIdle) {
+            setBitmapFromHttp(imageView, url);
         }
     }
 
     private void setBitmapFromHttp(ImageView img, String url) {
         BitMapWorkerTask task = new BitMapWorkerTask();
+        //防止图片闪烁
+        img.setTag(R.id.tag_set_bitmap,url);
         MyImageView myImageview = new MyImageView(img, url);
         task.execute(myImageview);
     }
-
-
 
     //对内存的缓存
     private Bitmap getBitmapFromMemoryCache(String url){
@@ -174,8 +170,7 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
         }
     }
 
-
-    class BitMapWorkerTask extends AsyncTask<MyImageView, Void , MyImageView>{
+    class BitMapWorkerTask extends AsyncTask<MyImageView, Void , MyImageView> {
 
         @Override
         //下载文件并缓存至DiskLruCache
@@ -184,11 +179,11 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
             String key = Util.hashKeyFromString(myImageView.url);
             try {
                 DiskLruCache.Editor editor = mDiskLruCache.edit(key);
-                if (editor != null){
+                if (editor != null) {
                     OutputStream out = editor.newOutputStream(0);
-                    if (Util.downloadUrlToStream(myImageView.url, out)){
+                    if (Util.downloadUrlToStream(myImageView.url, out)) {
                         editor.commit();
-                    }else {
+                    } else {
                         editor.abort();
                     }
                 }
@@ -203,72 +198,25 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
         @Override
         //从DiskLruCache中读取文件并放入内存中，顺便set下imageView
         protected void onPostExecute(MyImageView myImageView) {
-            ImageView imageView = myImageView.imgView;
             Bitmap bitmap = null;
             String key = Util.hashKeyFromString(myImageView.url);
             try {
                 DiskLruCache.Snapshot snapShot = mDiskLruCache.get(key);
-                if (snapShot != null){
+                if (snapShot != null) {
                     bitmap = decodeSampleBitmapFromSnapshot(snapShot,
                             imageReqWidth, imageReqHeight);
                     if (bitmap != null)
-                    addBitmapToMemoryCache(myImageView.url, bitmap);
+                        addBitmapToMemoryCache(myImageView.url, bitmap);
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            if (imageView!= null && bitmap != null){
-                imageView.setImageBitmap(bitmap);
+            //如果对图片执行了异步处理后，现在视野中的那个imgView没有被回收重用（重新setTag）则将bitmap设置进去
+            if (myImageView.url.equals(myImageView.imgView.getTag(R.id.tag_set_bitmap))  && bitmap != null){
+                myImageView.imgView.setImageBitmap(bitmap);
             }
         }
     }
-
-
-
-    //    @Override
-//    public void onScrollStateChanged(AbsListView view, int scrollState) {
-//        if (scrollState == SCROLL_STATE_IDLE){
-//            loadBitmaps(firstVisibleItem, visibleItemCount);
-//        }else {
-//            cancleTasks();
-//        }
-//    }
-//
-//    @Override
-//    public void onScroll(AbsListView view, int firstVisibleItem,
-//                         int visibleItemCount, int totalItemCount) {
-//        this.firstVisibleItem = firstVisibleItem;
-//        this.visibleItemCount = visibleItemCount;
-//        if (isFrist && visibleItemCount>0){
-//            loadBitmaps(firstVisibleItem, visibleItemCount);
-//            isFrist = false;
-//        }
-//    }
-
-//    private void loadBitmaps(int firstVisibleItem, int visibleItemCount) {
-//        try {
-//            for (int i=firstVisibleItem; i<firstVisibleItem+visibleItemCount; i++){
-//                String url = datas.get(i).getUrl();
-//                Bitmap bitmap = getBitmapFromMemoryCache(url);
-//                if (bitmap != null){
-//                    ImageView imageView = (ImageView) mPhotoWall.findViewWithTag(url);
-//                    imageView.setImageBitmap(bitmap);
-//                }else {
-//                    BitMapWorkerTask task = new BitMapWorkerTask();
-//                    task.execute(url);
-//                    taskConllection.add(task);
-//                }
-//            }
-//        }catch (Exception e){
-//            e.printStackTrace();
-//        }
-//    }
-//
-//    private void cancleTasks(){
-//        for (BitMapWorkerTask task : taskConllection){
-//            task.cancel(false);
-//        }
-//    }
 
     public interface ImgClick{
         void onItemClick(ArrayList<MyImage> datas, int position);
@@ -278,7 +226,7 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
     public void onClick(View v) {
         switch (v.getId()){
             case R.id.image_item_img:
-                imgClick.onItemClick(datas, (Integer) v.getTag());
+                imgClick.onItemClick(datas, (Integer) v.getTag(R.id.tag_intent));
         }
     }
 
@@ -302,11 +250,6 @@ class MyViewHolder extends RecyclerView.ViewHolder{
 class MyImageView {
     ImageView imgView;
     String url;
-    Bitmap bitmap;
-
-    public void setBitmap(Bitmap bitmap) {
-        this.bitmap = bitmap;
-    }
 
     public MyImageView(ImageView img, String url) {
         this.imgView = img;
