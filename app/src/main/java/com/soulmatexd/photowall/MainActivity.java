@@ -16,10 +16,16 @@ import android.support.v7.widget.Toolbar;
 import android.util.Log;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements SwipeRefreshLayout.OnRefreshListener{
     private ArrayList<MyImage> datas;
@@ -45,19 +51,24 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
         public void handleMessage(Message msg) {
             String response;
             Gson gson = new Gson();
-            Type type = new TypeToken<Bean>() {
+            Type type = new TypeToken<List<MyImage>>() {
             }.getType();
             response = (String)msg.obj;
-            response.trim();
-            Bean bean1 = gson.fromJson(response, type);
-            if (isBegin){
-                datas.addAll(bean1.results);
-                isBegin = false;
-            }else {
-                adapter.addDatas(bean1.results);
+            try {
+                JSONObject jsonObject = new JSONObject(response);
+                JSONArray jsonArray = jsonObject.getJSONArray("results");
+                ArrayList<MyImage> data = gson.fromJson(jsonArray.toString(), type);
+                if (isBegin){
+                    datas.addAll(data);
+                    isBegin = false;
+                }else {
+                    adapter.addDatas(data);
+                }
+                adapter.notifyDataSetChanged();
+                swipeRefreshLayout.setRefreshing(false);
+            } catch (JSONException e) {
+                e.printStackTrace();
             }
-            adapter.notifyDataSetChanged();
-            swipeRefreshLayout.setRefreshing(false);
         }
     };
 

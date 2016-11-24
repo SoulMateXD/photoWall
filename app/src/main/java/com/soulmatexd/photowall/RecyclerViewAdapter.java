@@ -7,10 +7,12 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
 import android.support.annotation.BoolRes;
+import android.support.v7.widget.CardView;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.RecyclerView.OnScrollListener;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.util.LruCache;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -120,7 +122,12 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
         holder.imageView.setOnClickListener(this);
         //当设置多个tag时，必须在ids.xml中进行设置
         holder.imageView.setTag(R.id.tag_intent, position);
-        setBitmap(holder.imageView, datas.get(position).getUrl());
+        setBitmap(holder, datas.get(position).getUrl());
+    }
+
+    @Override
+    public void onViewRecycled(MyViewHolder holder) {
+        super.onViewRecycled(holder);
     }
 
     @Override
@@ -129,10 +136,10 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
     }
 
     //图片三级缓存逻辑函数
-    private void setBitmap(ImageView imageView, String url){
+    private void setBitmap(MyViewHolder holder, String url){
         Bitmap bitmap = getBitmapFromMemoryCache(url);
         if(bitmap != null){
-            imageView.setImageBitmap(bitmap);
+            holder.imageView.setImageBitmap(bitmap);
             return;
         }
         try {
@@ -140,22 +147,23 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
             if (snapshot != null){
                 bitmap = MyBitmapFactory.decodeSampleBitmapFromSnapshot(snapshot, imageReqWidth,imageReqHeight);
                 if (bitmap != null)
-                imageView.setImageBitmap(bitmap);
+                holder.imageView.setImageBitmap(bitmap);
                 return;
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
         if (isRecyclerViewIdle) {
-            setBitmapFromHttp(imageView, url);
+            setBitmapFromHttp(holder.imageView, url, holder.cardView);
         }
     }
 
-    private void setBitmapFromHttp(ImageView img, String url) {
+    private void setBitmapFromHttp(ImageView img, String url, CardView cardView) {
         BitMapWorkerTask task = new BitMapWorkerTask();
         //防止图片闪烁
-        img.setTag(R.id.tag_set_bitmap,url);
-        MyImageView myImageview = new MyImageView(img, url);
+        cardView.setTag(R.id.tag_set_bitmap,url);
+        img.setTag(R.id.tag_set_bitmap, url);
+        MyImageView myImageview = new MyImageView(img, url, cardView);
         task.execute(myImageview);
     }
 
@@ -212,7 +220,13 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
                 e.printStackTrace();
             }
             //如果对图片执行了异步处理后，现在视野中的那个imgView没有被回收重用（重新setTag）则将bitmap设置进去
-            if (myImageView.url.equals(myImageView.imgView.getTag(R.id.tag_set_bitmap))  && bitmap != null){
+            //注意，此处设置的Tag是为CardView设置的Tag
+            //Question：  为什么给imageView设置Tag就不行？recyclerview回收到底回收啥？
+            Log.d("MainAdapter", myImageView.imgView.getTag().toString());
+            if (myImageView.imgView.getTag() == null){
+                Log.d("MainAdapter", "null null null");
+            }
+            if (myImageView.url.equals(myImageView.cardView.getTag(R.id.tag_set_bitmap))  && bitmap != null){
                 myImageView.imgView.setImageBitmap(bitmap);
             }
         }
@@ -238,20 +252,23 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
 class MyViewHolder extends RecyclerView.ViewHolder{
     ImageView imageView;
     TextView textView;
+    CardView cardView;
 
     public MyViewHolder(View itemView) {
         super(itemView);
         imageView = (ImageView) itemView.findViewById(R.id.image_item_img);
         textView = (TextView) itemView.findViewById(R.id.image_item_author);
+        cardView = (CardView) itemView.findViewById(R.id.itme_cardview);
     }
 
 }
 
 class MyImageView {
+    CardView cardView;
     ImageView imgView;
     String url;
 
-    public MyImageView(ImageView img, String url) {
+    public MyImageView(ImageView img, String url, CardView cardView) {
         this.imgView = img;
         this.url = url;
     }
