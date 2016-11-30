@@ -3,18 +3,18 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/itme_cardview"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
+    android:layout_width="wrap_content"
+    android:layout_height="250dp"
     android:layout_marginLeft="5dp"
     android:layout_marginRight="5dp"
     android:layout_marginTop="5dp"
     android:layout_marginBottom="5dp"
-    app:cardCornerRadius="15dp"
-    app:cardElevation="10dp"
-    app:cardBackgroundColor="#ffcfe0"
+    app:cardCornerRadius="5dp"
+    app:cardElevation="5dp"
+    app:cardBackgroundColor="#ffffff"
     >
-    <LinearLayout
-        android:orientation="vertical" android:layout_width="match_parent"
+    <RelativeLayout
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:paddingTop="5dp"
         android:paddingBottom="5dp"
@@ -26,15 +26,17 @@
         <ImageView
             android:id="@+id/image_item_img"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:scaleType="fitCenter" />
+            android:layout_height="240dp"
+            android:scaleType="centerCrop"
+            android:layout_centerInParent="true"/>
 
          <TextView
              android:id="@+id/image_item_author"
-              android:layout_width="wrap_content"
+             android:layout_width="wrap_content"
              android:layout_height="wrap_content"
              android:layout_gravity="center_horizontal"
              android:textColor="#599bff"
+             android:visibility="gone"
              />
-          </LinearLayout>
+          </RelativeLayout>
 </android.support.v7.widget.CardView>

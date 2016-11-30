@@ -74,7 +74,7 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
         this.context = context;
         mPhotoWall = photoWall;
         linearLayoutManager = (LinearLayoutManager) mPhotoWall.getLayoutManager();
-        imageReqHeight = imageReqWidth = 300;
+        imageReqHeight = imageReqWidth = 240;
 
         //内存缓存
         mMemoryCache = new LruCache<String, Bitmap>(CACHESIZE){
@@ -125,8 +125,12 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
         setBitmap(holder, datas.get(position).getUrl());
     }
 
+
+    //这句必须得加上，不然图片会乱跳   还是recyclerview回收的问题，到底回收什么？
     @Override
     public void onViewRecycled(MyViewHolder holder) {
+        holder.imageView.setImageBitmap(null);
+        holder.cardView.setTag(R.id.tag_set_bitmap, "meiyoushuju");
         super.onViewRecycled(holder);
     }
 
@@ -162,7 +166,6 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
         BitMapWorkerTask task = new BitMapWorkerTask();
         //防止图片闪烁
         cardView.setTag(R.id.tag_set_bitmap,url);
-        img.setTag(R.id.tag_set_bitmap, url);
         MyImageView myImageview = new MyImageView(img, url, cardView);
         task.execute(myImageview);
     }
@@ -184,12 +187,28 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
         //下载文件并缓存至DiskLruCache
         protected MyImageView doInBackground(MyImageView... params) {
             MyImageView myImageView = params[0];
+            myImageView.bitmap = HttpUtil.getBitMap(myImageView.url, imageReqWidth, imageReqHeight);
+            return myImageView;
+        }
+
+        @Override
+        //从DiskLruCache中读取文件并放入内存中，顺便set下imageView
+        protected void onPostExecute(MyImageView myImageView) {
+            Bitmap bitmap = myImageView.bitmap;
+            //如果对图片执行了异步处理后，现在视野中的那个imgView没有被回收重用（重新setTag）则将bitmap设置进去
+            //注意，此处设置的Tag是为CardView设置的Tag
+            //Question：  为什么此时给imageView设置的Tag为null？recyclerview回收到底回收啥？
+            if (myImageView.url.equals(myImageView.cardView.getTag(R.id.tag_set_bitmap))  && bitmap != null){
+                myImageView.imgView.setImageBitmap(bitmap);
+            }
+            addBitmapToMemoryCache(myImageView.url, bitmap);
+
             String key = Util.hashKeyFromString(myImageView.url);
             try {
                 DiskLruCache.Editor editor = mDiskLruCache.edit(key);
                 if (editor != null) {
                     OutputStream out = editor.newOutputStream(0);
-                    if (Util.downloadUrlToStream(myImageView.url, out)) {
+                    if (Util.putBitmapToOutputStream(bitmap, out)) {
                         editor.commit();
                     } else {
                         editor.abort();
@@ -200,35 +219,6 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<MyViewHolder> impl
                 e.printStackTrace();
             }
 
-            return myImageView;
-        }
-
-        @Override
-        //从DiskLruCache中读取文件并放入内存中，顺便set下imageView
-        protected void onPostExecute(MyImageView myImageView) {
-            Bitmap bitmap = null;
-            String key = Util.hashKeyFromString(myImageView.url);
-            try {
-                DiskLruCache.Snapshot snapShot = mDiskLruCache.get(key);
-                if (snapShot != null) {
-                    bitmap = decodeSampleBitmapFromSnapshot(snapShot,
-                            imageReqWidth, imageReqHeight);
-                    if (bitmap != null)
-                        addBitmapToMemoryCache(myImageView.url, bitmap);
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            //如果对图片执行了异步处理后，现在视野中的那个imgView没有被回收重用（重新setTag）则将bitmap设置进去
-            //注意，此处设置的Tag是为CardView设置的Tag
-            //Question：  为什么给imageView设置Tag就不行？recyclerview回收到底回收啥？
-            Log.d("MainAdapter", myImageView.imgView.getTag().toString());
-            if (myImageView.imgView.getTag() == null){
-                Log.d("MainAdapter", "null null null");
-            }
-            if (myImageView.url.equals(myImageView.cardView.getTag(R.id.tag_set_bitmap))  && bitmap != null){
-                myImageView.imgView.setImageBitmap(bitmap);
-            }
         }
     }
 
@@ -267,10 +257,12 @@ class MyImageView {
     CardView cardView;
     ImageView imgView;
     String url;
+    Bitmap bitmap;
 
     public MyImageView(ImageView img, String url, CardView cardView) {
         this.imgView = img;
         this.url = url;
+        this.cardView = cardView;
     }
 }
 

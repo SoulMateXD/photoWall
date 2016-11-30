@@ -12,6 +12,7 @@ import com.jakewharton.disklrucache.DiskLruCache;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileDescriptor;
@@ -273,6 +274,25 @@ class Util{
             } catch (IOException e) {
                 e.printStackTrace();
             }
+        }
+        return false;
+    }
+
+    public static boolean putBitmapToOutputStream(Bitmap bitmap, OutputStream outputStream){
+        BufferedInputStream in;
+        BufferedOutputStream out;
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream);
+        in = new BufferedInputStream(new ByteArrayInputStream(byteArrayOutputStream.toByteArray()));
+        out = new BufferedOutputStream(outputStream);
+        int b;
+        try {
+            while ((b = in.read()) != -1){
+                out.write(b);
+            }
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
         }
         return false;
     }

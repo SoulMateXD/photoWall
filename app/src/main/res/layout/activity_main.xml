@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context="com.soulmatexd.photowall.MainActivity"
-    android:background="#ffff90">
+    android:background="#ffcfe0">
     
     <android.support.v7.widget.Toolbar
         android:id="@+id/main_toolbar"
